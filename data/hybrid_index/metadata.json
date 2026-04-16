@@ -1,0 +1,20 @@
+{
+  "resume_texts": [
+    "robert brown david.doe@company.com +1-687-622-2601 san francisco, ny linkedin.com in sarah-smith professional summary experienced provide professional accounting services for indiv... professional with strong expertise in tax preparation, audit, budgeting. proven track record of delivering results and driving innovation. technical skills tax preparation, audit, budgeting professional experience professional - technology company 2019-2023 delivered high-quality solutions and maintained excellent performance. education bachelor of science university of technology 2018-2022"
+  ],
+  "jd_texts": [],
+  "resume_metadata": [
+    {
+      "name": "Robert Brown",
+      "candidate_id": "test_Robert_Brown_Provide_professional_acco",
+      "skills": [
+        "Tax Preparation",
+        "Audit",
+        "Budgeting"
+      ],
+      "location": "San Francisco, NY",
+      "experience": 4
+    }
+  ],
+  "jd_metadata": []
+}

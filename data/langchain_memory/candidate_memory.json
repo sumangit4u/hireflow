@@ -1,0 +1,20 @@
+{
+  "interactions": [
+    {
+      "content": "Candidate John Doe (candidate_001) - viewed",
+      "timestamp": ""
+    },
+    {
+      "content": "Interaction recorded at 6590ed13-612f-4f38-96a2-2390d7759170",
+      "timestamp": ""
+    },
+    {
+      "content": "Candidate Jane Smith (candidate_002) - evaluated - Score: 8.5",
+      "timestamp": ""
+    },
+    {
+      "content": "Interaction recorded at 6590ed13-612f-4f38-96a2-2390d7759170",
+      "timestamp": ""
+    }
+  ]
+}

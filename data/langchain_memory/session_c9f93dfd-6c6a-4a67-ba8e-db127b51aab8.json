@@ -1,0 +1,17 @@
+{
+  "messages": [
+    {
+      "type": "SystemMessage",
+      "content": "Search session started for c9f93dfd-6c6a-4a67-ba8e-db127b51aab8"
+    },
+    {
+      "type": "HumanMessage",
+      "content": "Search: test persistence query"
+    },
+    {
+      "type": "AIMessage",
+      "content": "Found 1 results"
+    }
+  ],
+  "session_id": "c9f93dfd-6c6a-4a67-ba8e-db127b51aab8"
+}

@@ -1,0 +1,71 @@
+[
+  {
+    "type": "search_query",
+    "query_id": "3e0e4bf6-020e-4cf2-9d47-3d91989aacda",
+    "query_text": "accountant with QuickBooks experience",
+    "timestamp": "2025-08-26T10:56:42.073786",
+    "session_id": "7f834f3b-2525-464f-aa13-3ce2d0d44d3f"
+  },
+  {
+    "type": "candidate_interaction",
+    "candidate_id": "candidate_001",
+    "candidate_name": "John Doe",
+    "interaction_type": "viewed",
+    "timestamp": "2025-08-26T10:56:42.074086",
+    "session_id": "7f834f3b-2525-464f-aa13-3ce2d0d44d3f"
+  },
+  {
+    "type": "candidate_interaction",
+    "candidate_id": "candidate_002",
+    "candidate_name": "Jane Smith",
+    "interaction_type": "evaluated",
+    "timestamp": "2025-08-26T10:56:42.074313",
+    "session_id": "7f834f3b-2525-464f-aa13-3ce2d0d44d3f"
+  },
+  {
+    "type": "search_query",
+    "query_id": "83dd290b-d474-4a53-8828-3cef13f0c958",
+    "query_text": "accountant with QuickBooks experience",
+    "timestamp": "2025-08-26T10:57:16.019602",
+    "session_id": "88c523a1-4a84-4572-b521-972140ecfc2e"
+  },
+  {
+    "type": "candidate_interaction",
+    "candidate_id": "candidate_001",
+    "candidate_name": "John Doe",
+    "interaction_type": "viewed",
+    "timestamp": "2025-08-26T10:57:16.019886",
+    "session_id": "88c523a1-4a84-4572-b521-972140ecfc2e"
+  },
+  {
+    "type": "candidate_interaction",
+    "candidate_id": "candidate_002",
+    "candidate_name": "Jane Smith",
+    "interaction_type": "evaluated",
+    "timestamp": "2025-08-26T10:57:16.020220",
+    "session_id": "88c523a1-4a84-4572-b521-972140ecfc2e"
+  },
+  {
+    "type": "search_query",
+    "query_id": "59a38b6d-82bd-452a-b844-dfb66714ab8d",
+    "query_text": "accountant with QuickBooks experience",
+    "timestamp": "2025-08-26T10:57:52.071795",
+    "session_id": "ca293a45-e6d8-4dff-b812-f9d79318cc00"
+  },
+  {
+    "type": "candidate_interaction",
+    "candidate_id": "candidate_001",
+    "candidate_name": "John Doe",
+    "interaction_type": "viewed",
+    "timestamp": "2025-08-26T10:57:52.072123",
+    "session_id": "ca293a45-e6d8-4dff-b812-f9d79318cc00"
+  },
+  {
+    "type": "candidate_interaction",
+    "candidate_id": "candidate_002",
+    "candidate_name": "Jane Smith",
+    "interaction_type": "evaluated",
+    "timestamp": "2025-08-26T10:57:52.072475",
+    "session_id": "ca293a45-e6d8-4dff-b812-f9d79318cc00"
+  }
+]

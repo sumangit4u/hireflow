@@ -1,0 +1,33 @@
+{
+  "messages": [
+    {
+      "type": "SystemMessage",
+      "content": "Search session started for 6590ed13-612f-4f38-96a2-2390d7759170"
+    },
+    {
+      "type": "HumanMessage",
+      "content": "Search: accountant with QuickBooks experience"
+    },
+    {
+      "type": "AIMessage",
+      "content": "Found 5 results"
+    },
+    {
+      "type": "HumanMessage",
+      "content": "Viewed candidate John Doe (candidate_001)"
+    },
+    {
+      "type": "AIMessage",
+      "content": "Interaction recorded: viewed"
+    },
+    {
+      "type": "HumanMessage",
+      "content": "Viewed candidate Jane Smith (candidate_002) - Score: 8.5 - Notes: Strong technical skills"
+    },
+    {
+      "type": "AIMessage",
+      "content": "Interaction recorded: evaluated"
+    }
+  ],
+  "session_id": "6590ed13-612f-4f38-96a2-2390d7759170"
+}
