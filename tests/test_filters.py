@@ -151,10 +151,17 @@ class TestFilterByExperience:
         result = filter_by_experience(CANDIDATES, 0)
         assert len(result) == len(CANDIDATES)
 
-    def test_candidate_with_none_experience_excluded(self):
+    def test_candidate_with_unknown_experience_is_kept(self):
+        """Unknown experience is not treated as zero experience.
+
+        `experience` is None when Gemini could not extract it from the resume,
+        which says nothing about the candidate. Dropping them would silently
+        hide people because of a parsing failure, so the filter keeps them and
+        lets a human decide.
+        """
         candidates = [_make_candidate("cx", ["Python"], "NYC", None)]
         result = filter_by_experience(candidates, 1)
-        assert result == []
+        assert [c["candidate_id"] for c in result] == ["cx"]
 
 
 # ---------------------------------------------------------------------------

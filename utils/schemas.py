@@ -7,7 +7,7 @@ from typing import List, Optional
 
 @dataclass
 class SearchQuery:
-    """Lightweight query context passed to the re-ranker and search functions."""
+    """Lightweight query context passed to search and evaluation."""
     title: str
     text: str
     required_skills: List[str] = dc_field(default_factory=list)
@@ -26,11 +26,14 @@ class Resume(BaseModel):
 
 
 class CandidateEvaluation(BaseModel):
+    """Qualitative LLM assessment of a candidate.
+
+    Deliberately carries no numeric score. Ranking is expressed by the three
+    retrieval scores (BM25, vector, and their RRF combination); adding a
+    fourth, differently-derived number here only obscured what those mean.
+    """
     candidate_id: str
-    fit_score: int = Field(..., ge=0, le=100, description="Fit score (0-100)")
     strengths: List[str]
     gaps: List[str]
     risks: List[str] = Field(default_factory=list)
     summary: str
-
-    evidence: Optional[dict] = Field(default_factory=dict)

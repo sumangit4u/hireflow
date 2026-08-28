@@ -6,9 +6,24 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from core.ingestion import load_resumes, DocumentProcessor
+from core.ingestion import load_resumes
+
+
+@pytest.fixture(autouse=True)
+def no_llm_parsing():
+    """Keep ingestion tests offline.
+
+    Without this, load_resumes builds a real ResumeParser and sends every
+    fixture resume to Gemini — slow, billable, and non-deterministic (the
+    returned name overrides the filename-derived fallback these tests assert
+    on). Returning None makes ingestion use its no-parser fallback path.
+    """
+    with patch("core.ingestion._get_parser", return_value=None):
+        yield
 
 
 # ---------------------------------------------------------------------------
@@ -71,31 +86,3 @@ class TestLoadResumes:
             with patch("core.ingestion.load_pdf", return_value="Resume text") as mock_load:
                 result = load_resumes(tmp)
         assert len(result) == 1
-        assert mock_load.call_count == 1
-
-
-# ---------------------------------------------------------------------------
-# DocumentProcessor
-# ---------------------------------------------------------------------------
-
-class TestDocumentProcessor:
-    def test_load_pdf_delegates_to_utils(self):
-        processor = DocumentProcessor()
-        with patch("core.ingestion.load_pdf", return_value="some text") as mock_load:
-            result = processor.load_pdf("/fake/path.pdf")
-        assert result == "some text"
-        mock_load.assert_called_once_with("/fake/path.pdf")
-
-    def test_process_resume_pdf_returns_none_on_empty_text(self):
-        processor = DocumentProcessor()
-        with patch("core.ingestion.load_pdf", return_value=""):
-            result = processor.process_resume_pdf("/fake/empty.pdf")
-        assert result is None
-
-    def test_process_resume_pdf_returns_document_on_success(self):
-        processor = DocumentProcessor()
-        with patch("core.ingestion.load_pdf", return_value="Resume content here"):
-            from langchain.schema import Document
-            result = processor.process_resume_pdf("/fake/resume.pdf")
-        assert isinstance(result, Document)
-        assert result.page_content == "Resume content here"

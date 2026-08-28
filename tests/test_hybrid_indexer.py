@@ -80,8 +80,25 @@ class TestIndexResumes:
 
 class TestCombineResults:
     def _setup_indexer(self, texts: list) -> HybridIndexer:
+        """Seed the corpus the way index_resumes does — texts and metadata
+        together, one entry per candidate and the same length.
+
+        combine_results reads resume_metadata[i] alongside resume_texts[i], so
+        setting only the texts leaves the two lists out of step and raises
+        IndexError. Real indexing always appends to both.
+        """
         indexer = _make_indexer()
         indexer.resume_texts = texts
+        indexer.resume_metadata = [
+            {
+                "candidate_id": f"c_{i}",
+                "name": f"Candidate {i}",
+                "skills": [],
+                "location": "Unknown",
+                "experience": None,
+            }
+            for i in range(len(texts))
+        ]
         return indexer
 
     def test_empty_inputs_return_empty(self):

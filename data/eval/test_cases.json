@@ -1,0 +1,61 @@
+{
+  "_comment": [
+    "Test cases for offline retrieval evaluation (uv run python evaluate_retrieval.py).",
+    "A candidate is relevant when its indexed skills contain every skill in",
+    "'relevant_skills'. Skill names must match what the parser extracted — check",
+    "with: uv run python evaluate_retrieval.py --list-skills",
+    "Use 'relevant_candidate_ids' instead to pin exact ids by hand."
+  ],
+  "cases": [
+    {
+      "query": "tax preparation specialist",
+      "relevant_skills": ["tax preparation"],
+      "note": "Single skill stated almost verbatim — BM25 should do well here."
+    },
+    {
+      "query": "accountant who handles month-end closing",
+      "relevant_skills": ["month-end closing"],
+      "note": "Skill phrased inside a sentence rather than as a keyword."
+    },
+    {
+      "query": "cost accounting and variance analysis",
+      "relevant_skills": ["cost accounting", "variance analysis"],
+      "note": "Two skills — a candidate must have both to count as relevant."
+    },
+    {
+      "query": "someone to reconcile bank statements",
+      "relevant_skills": ["bank reconciliation"],
+      "note": "Paraphrase: no exact term match, so this leans on vector search."
+    },
+    {
+      "query": "financial reporting and general ledger experience",
+      "relevant_skills": ["financial reporting", "general ledger"],
+      "note": "Two common skills — a large relevant set, easier to score well on."
+    },
+    {
+      "query": "payroll processing",
+      "relevant_skills": ["payroll processing"],
+      "note": "Narrower skill, so a smaller relevant set."
+    },
+    {
+      "query": "budget planning and forecasting",
+      "relevant_skills": ["budget planning"],
+      "note": "Query adds a term ('forecasting') that is not in the ground truth."
+    },
+    {
+      "query": "candidate comfortable writing SQL queries",
+      "relevant_skills": ["sql"],
+      "note": "Technical skill in an otherwise accounting-heavy corpus."
+    },
+    {
+      "query": "accounts payable clerk",
+      "relevant_skills": ["accounts payable"],
+      "note": "Job-title phrasing rather than a skill listing."
+    },
+    {
+      "query": "experience with ERP systems",
+      "relevant_skills": ["erp systems"],
+      "note": "Category term that may appear in several different forms."
+    }
+  ]
+}

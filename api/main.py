@@ -29,7 +29,7 @@ if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
 from core.hybrid_indexer import HybridIndexer
-from core.ingestion import load_resumes
+from core.indexing_service import build_index, index_status, load_index
 
 # ---------------------------------------------------------------------------
 # Application-level singleton — shared across requests
@@ -41,10 +41,16 @@ _DATA_RESUMES_DIR = _project_root / "data" / "resumes"
 
 
 def get_indexer() -> HybridIndexer:
-    """Return (and lazily initialise) the shared HybridIndexer instance."""
+    """Return (and lazily initialise) the shared HybridIndexer instance.
+
+    The persisted index is loaded once, on first use. That is a local file read
+    plus an in-memory BM25 rebuild — no PDF parsing, no Gemini calls — so the
+    backend comes up searchable without re-running POST /index after a restart.
+    """
     global _indexer
     if _indexer is None:
         _indexer = HybridIndexer()
+        load_index(_indexer)
     return _indexer
 
 
@@ -83,23 +89,37 @@ class StatusResponse(BaseModel):
     vector_store_ready: bool
     hybrid_ready: bool
     pinecone_vector_count: int
+    indexed_resumes: int
+    last_indexed: Optional[str]
+    unindexed_pdfs: int
 
 
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
 
-@app.post("/index", response_model=IndexResponse, summary="Index all resumes in data/resumes/")
-def index_resumes():
-    """Load all PDFs from data/resumes/ and (re-)index them in BM25 + Pinecone."""
+@app.post("/index", response_model=IndexResponse, summary="Index resumes in data/resumes/")
+def index_resumes(force: bool = False):
+    """Index the PDFs in data/resumes/ into BM25 + Pinecone and persist the result.
+
+    Incremental by default — only new or changed PDFs are parsed. Pass
+    `?force=true` to re-parse every resume (one Gemini call each).
+    """
     indexer = get_indexer()
-    resumes = load_resumes(str(_DATA_RESUMES_DIR))
-    if not resumes:
+    report = build_index(indexer, resumes_dir=str(_DATA_RESUMES_DIR), force=force)
+
+    if report.total_indexed == 0:
         raise HTTPException(status_code=404, detail="No resume PDFs found in data/resumes/")
-    ok = indexer.index_resumes(resumes)
-    if not ok:
+    if not report.persisted:
         raise HTTPException(status_code=500, detail="Indexing failed — check server logs")
-    return IndexResponse(indexed=len(resumes), message=f"Successfully indexed {len(resumes)} resumes")
+
+    return IndexResponse(
+        indexed=report.total_indexed,
+        message=(
+            f"Index ready: {report.summary()}"
+            + (f"; {len(report.failed)} failed" if report.failed else "")
+        ),
+    )
 
 
 @app.post("/search", response_model=SearchResponse, summary="Search for matching candidates")
@@ -109,7 +129,7 @@ def search(request: SearchRequest):
     if not indexer.bm25_resumes:
         raise HTTPException(
             status_code=503,
-            detail="Index not ready. Call POST /index first."
+            detail="Index not ready. Run 'python index_resumes.py' or call POST /index first."
         )
     raw_results = indexer.search_resumes(request.query, top_k=request.top_k)
     results = [
@@ -133,13 +153,13 @@ def status():
     """Return BM25 and Pinecone readiness along with vector count."""
     indexer = get_indexer()
     stats = indexer.get_index_stats()
-    pinecone_count = 0
-    if indexer.vector_store.is_ready():
-        pinecone_stats = indexer.vector_store.get_stats()
-        pinecone_count = pinecone_stats.get("total_vector_count", 0)
+    index_info = index_status(indexer)
     return StatusResponse(
         resumes_ready=stats["resumes_ready"],
         vector_store_ready=stats["vector_store_ready"],
         hybrid_ready=stats["hybrid_ready"],
-        pinecone_vector_count=pinecone_count,
+        pinecone_vector_count=index_info.get("pinecone_vector_count", 0),
+        indexed_resumes=index_info["indexed_resumes"],
+        last_indexed=index_info["updated_at"],
+        unindexed_pdfs=len(index_info["unindexed_pdfs"]),
     )

@@ -2,7 +2,7 @@
 
 ## Overview
 
-HireFlow is a resume-only AI candidate search engine. It indexes PDF resumes using both BM25 (lexical) and Pinecone vector (semantic) search, fuses results with Reciprocal Rank Fusion (RRF), applies post-search filters, and optionally re-ranks candidates with a Gemini LLM evaluator.
+HireFlow is a resume-only AI candidate search engine. It indexes PDF resumes using both BM25 (lexical) and Pinecone vector (semantic) search, fuses results with Reciprocal Rank Fusion (RRF), applies post-search filters, and adds a qualitative Gemini assessment to the top results. Candidates are ranked by the retrieval scores alone — the LLM explains matches, it does not score them.
 
 The system is split into a **FastAPI backend** (handles indexing and search) and a **Streamlit frontend** (handles UI). Both can run independently.
 
@@ -16,7 +16,7 @@ graph TB
         UPLOAD[Upload Resumes]
         SEARCH[Search Form<br>title / description / skills / location / experience]
         RESULTS[Results Display<br>BM25 + Vector + RRF scores]
-        MEMORY[Memory & Evaluation Dashboard]
+        EVALPAGE[Retrieval Evaluation<br>MRR / MAP / NDCG]
     end
 
     subgraph API["FastAPI Backend (api/main.py)"]
@@ -29,9 +29,8 @@ graph TB
         INGESTION[ingestion.py<br>PDF -> Document]
         INDEXER[hybrid_indexer.py<br>BM25 + Vector]
         FILTERS[filters.py<br>skills / location / experience]
-        RERANKER[re_ranker.py<br>LLM evaluation]
-        MEMORY_RAG[memory_rag.py<br>search history]
-        EVALUATOR[evaluator.py<br>RAGAS metrics]
+        EVALUATORC[candidate_evaluator.py<br>LLM assessment]
+        RETEVAL[retrieval_eval.py<br>MRR / MAP / NDCG]
     end
 
     subgraph INFRA["Infrastructure"]
@@ -48,11 +47,11 @@ graph TB
     INDEXER --> EMBEDDINGS
     SEARCH_EP --> INDEXER
     INDEXER --> FILTERS
-    FILTERS --> RERANKER
-    RERANKER --> GEMINI
-    RERANKER --> RESULTS
-    MEMORY_RAG --> MEMORY
-    EVALUATOR --> MEMORY
+    FILTERS --> EVALUATORC
+    EVALUATORC --> GEMINI
+    EVALUATORC --> RESULTS
+    RETEVAL --> INDEXER
+    RETEVAL --> EVALPAGE
     STATUS_EP --> INDEXER
 ```
 
@@ -68,7 +67,7 @@ sequenceDiagram
     participant BM25
     participant Pinecone
     participant Filters
-    participant ReRanker
+    participant Evaluator
     participant Gemini
 
     User->>Streamlit: Enter search query + filters
@@ -86,12 +85,12 @@ sequenceDiagram
     Streamlit->>Filters: apply_filters(skills, location, experience)
     Filters-->>Streamlit: filtered_candidates
 
-    Streamlit->>ReRanker: re_rank_candidates(top_5, query)
-    ReRanker->>Gemini: evaluate each candidate
-    Gemini-->>ReRanker: strengths / gaps / risks / summary
-    ReRanker-->>Streamlit: CandidateEvaluation[fit_score 0-100]
+    Streamlit->>Evaluator: evaluate_candidates(top_5, query)
+    Evaluator->>Gemini: assess each candidate
+    Gemini-->>Evaluator: strengths / gaps / risks / summary
+    Evaluator-->>Streamlit: CandidateEvaluation[strengths / gaps / summary]
 
-    Streamlit->>User: Display ranked results with all scores
+    Streamlit->>User: Display results ranked by combined RRF score
 ```
 
 ---
@@ -121,9 +120,9 @@ Post-Search Filters (optional)
     skills / location / min_experience
     |
     v
-LLM Re-Ranking (optional, top-5 only)
-    fit_score = 50 + strength_score(max 30) - gap_penalty(max 40)
-    clamped to [0, 100]
+LLM Evaluation (optional, top-5 only)
+    qualitative only: strengths / gaps / risks / summary
+    produces no score and does not reorder results
 ```
 
 ---
@@ -137,36 +136,31 @@ LLM Re-Ranking (optional, top-5 only)
 | VectorStore | `core/vector_store.py` | Pinecone upsert and query |
 | Ingestion | `core/ingestion.py` | PDF -> LangChain Document |
 | ResumeParser | `core/parsing.py` | LLM-based structured field extraction |
-| ReRanker | `core/re_ranker.py` | Gemini evaluation with weighted scoring |
+| CandidateEvaluator | `core/candidate_evaluator.py` | Gemini qualitative assessment (no scoring) |
 | Filters | `core/filters.py` | Post-search filtering (skills/location/exp) |
-| MemoryRAG | `core/memory_rag.py` | LangChain conversation memory |
-| SearchRouter | `core/search_router.py` | Routes to shallow or deep search strategy |
-| RAGEvaluator | `core/evaluator.py` | RAGAS quality metrics |
+| retrieval_eval | `core/retrieval_eval.py` | MRR/MAP/NDCG and the evaluation runner |
 | SearchQuery | `utils/schemas.py` | Lightweight query context dataclass |
 | Resume | `utils/schemas.py` | Pydantic resume model |
 | CandidateEvaluation | `utils/schemas.py` | Pydantic evaluation result model |
 
 ---
 
-## Re-Ranker Scoring Detail
+## Candidate Evaluation Detail
+
+The evaluator is deliberately **not** a scorer. Candidates are ranked only by the
+three retrieval scores (BM25, vector, RRF). A fourth number derived from LLM prose
+competed with those and obscured what they meant, so it was removed.
 
 ### LLM path (Gemini available)
 ```
 1. Gemini extracts: 3 strengths, 3 gaps, any risks, summary
-2. For each item in strengths/gaps:
-   - positional_weight = (n - i) / n  (first item = highest weight)
-   - skill_match_weight = positional bonus if item matches a required skill
-   - experience_bonus = +0.2 if item mentions "experience"/"years"/"senior"
-3. strength_score = aggregate(strengths, max=30, is_gap=False)
-4. gap_penalty   = aggregate(gaps, max=40, is_gap=True)
-5. fit_score = clamp(50 + strength_score - gap_penalty, 0, 100)
+2. Those are returned verbatim as a CandidateEvaluation
+3. Input order is preserved — callers pair evaluations with
+   candidates by position, and candidates arrive in RRF order
 ```
 
 ### Fallback path (LLM unavailable)
 ```
-fit_score = 50 + (20 * n_strengths) - (15 * n_gaps)
-clamped to [0, 100]
-
 Strengths: candidate has required skills
 Gaps:      candidate missing required skills
 ```
@@ -175,13 +169,40 @@ Gaps:      candidate missing required skills
 
 ## Startup Behaviour (Streamlit)
 
-On cold start, `SystemManager.initialize()`:
-1. Initialises Pinecone and embeddings
-2. Checks `vector_store.get_stats()["total_vector_count"]`
-3. **If > 0**: rebuilds BM25 from local PDFs only (skips Pinecone upsert)
-4. **If 0**: runs full indexing (BM25 + Pinecone upsert)
+Startup does **no** indexing. On cold start, `SystemManager.initialize()`:
+1. Initialises Pinecone and the local embedding model
+2. Calls `load_index()`, which reads `data/hybrid_index/corpus.pkl` and rebuilds
+   BM25 in memory
 
-A **Force Re-index Resumes** button in the sidebar triggers a full re-index at any time.
+That is the whole sequence: no PDF reads, no Gemini calls, no Pinecone writes.
+Indexing is a separate, explicit step (`index_resumes.py`), because it costs one
+Gemini call per resume and should be paid once rather than on every launch.
+
+If no index exists, the app says so and shows the command instead of silently
+indexing. The sidebar offers **Index new resumes** (incremental) and **Force full
+rebuild**, both running the same `core/indexing_service.py` as the CLI.
+
+---
+
+## Offline Evaluation
+
+`core/retrieval_eval.py` scores retrieval quality against fixed test cases in
+`data/eval/test_cases.json`. Each case pairs a query with the skills that make a
+candidate relevant; ground truth is resolved from the indexed metadata.
+
+```
+test case ──> hybrid search ──> ranked candidate ids
+                                      |
+                                      v
+                          core/retrieval_eval.py
+                          MRR  first hit position only
+                          MAP  precision at every hit
+                          NDCG log-discounted, normalised
+```
+
+No LLM is involved — this measures retrieval, not answer quality. Run it with
+`python evaluate_retrieval.py` or from the sidebar's **Retrieval Evaluation**
+page.
 
 ---
 
@@ -197,5 +218,7 @@ All tests use `unittest.mock` — no live Pinecone or Gemini calls.
 |---|---|
 | `tests/test_filters.py` | skills / location / experience filtering |
 | `tests/test_hybrid_indexer.py` | BM25 indexing, RRF fusion, score normalization |
-| `tests/test_re_ranker.py` | LLM evaluation, rule-based fallback, section parsing |
-| `tests/test_ingestion.py` | PDF loading, metadata extraction, DocumentProcessor |
+| `tests/test_candidate_evaluator.py` | LLM assessment, rule-based fallback, section parsing |
+| `tests/test_retrieval_eval.py` | MRR / MAP / NDCG, with worked examples |
+| `tests/test_indexing_service.py` | Incremental + forced indexing, zero-cost startup |
+| `tests/test_ingestion.py` | PDF loading and metadata extraction |

@@ -1,0 +1,11 @@
+[server]
+# Streamlit's source watcher walks __path__ on every imported module. The
+# transformers package (pulled in by sentence-transformers) resolves its
+# submodules lazily, so that walk triggers imports like models.yolos, which
+# need torchvision and raise ModuleNotFoundError. The tracebacks are harmless
+# but they bury real errors, so the watcher is off. Restart the app manually
+# to pick up code changes.
+fileWatcherType = "none"
+
+[browser]
+gatherUsageStats = false

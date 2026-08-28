@@ -5,17 +5,56 @@ Centralized utilities used across the HireFlow project.
 
 import logging
 import re
-from typing import List
 from langchain_community.document_loaders import PyPDFLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+# Third-party loggers that emit a line per HTTP request. They are chatty enough
+# to bury HireFlow's own output — sentence-transformers alone logs a dozen
+# huggingface.co requests every time the embedding model loads.
+_NOISY_LOGGERS = (
+    "httpx",
+    "httpcore",
+    "urllib3",
+    "huggingface_hub",
+    "sentence_transformers",
+    "transformers",
+    "filelock",
+    "pinecone",
+    "openai",
+)
+
+_logging_configured = False
+
+
+def _configure_logging() -> None:
+    """Set up the root handler once: WARNING for libraries, INFO for HireFlow.
+
+    basicConfig sets the level on the *root* logger, so calling it with
+    level=INFO (as this used to) turns on INFO for every third-party library
+    too. The root handler is left at WARNING instead, and HireFlow's own
+    loggers opt in to INFO individually — a record still reaches the root
+    handler regardless of the root logger's level, because propagation only
+    re-checks handler levels, not ancestor logger levels.
+    """
+    global _logging_configured
+    if _logging_configured:
+        return
+
+    logging.basicConfig(
+        level=logging.WARNING,
+        format='[%(asctime)s] %(levelname)s: %(message)s',
+    )
+    for noisy in _NOISY_LOGGERS:
+        logging.getLogger(noisy).setLevel(logging.WARNING)
+
+    _logging_configured = True
+
 
 def get_logger(name: str) -> logging.Logger:
     """Create standardized logger with timestamp formatting"""
-    logging.basicConfig(
-        level=logging.INFO,
-        format='[%(asctime)s] %(levelname)s: %(message)s'
-    )
-    return logging.getLogger(name)
+    _configure_logging()
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.INFO)
+    return logger
 
 def clean_text(text: str) -> str:
     """Normalize text by removing extra whitespace and invalid characters"""
@@ -56,21 +95,6 @@ def load_pdf(file_path: str) -> str:
     except Exception as e:
         logger.error(f"Error loading PDF {file_path}: {e}")
         return ""
-
-def split_text(text: str, chunk_size: int = 1000, chunk_overlap: int = 200) -> List[str]:
-    """Split large text into overlapping chunks for processing"""
-    logger = get_logger(__name__)
-    
-    try:
-        splitter = RecursiveCharacterTextSplitter(
-            chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap,
-            separators=["\n\n", "\n", " ", ""]  # Split on paragraphs first, then lines, etc.
-        )
-        return splitter.split_text(text)
-    except Exception as e:
-        logger.error(f"Error splitting text: {e}")
-        return [text]  # Return original text if splitting fails
 
 def is_quota_error(error: Exception) -> bool:
     """Detect API quota/rate limit errors for graceful handling"""
